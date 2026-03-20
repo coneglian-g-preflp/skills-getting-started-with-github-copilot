@@ -20,11 +20,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Participantes (lista com marcadores)
+        let participantsHTML = "";
+        if (details.participants && details.participants.length > 0) {
+          participantsHTML = `
+            <div class="participants-section">
+              <strong>Participantes:</strong>
+              <ul class="participants-list no-bullets">
+                ${details.participants.map(p => `
+                  <li class="participant-item">
+                    <span class="participant-email">${p}</span>
+                    <button class="remove-participant-btn" title="Remover participante" data-activity="${name}" data-email="${p}">
+                      <span aria-hidden="true">🗑️</span>
+                    </button>
+                  </li>
+                `).join("")}
+              </ul>
+            </div>
+          `;
+        } else {
+          participantsHTML = `<div class="participants-section"><strong>Participantes:</strong> <span class="no-participants">Nenhum inscrito ainda</span></div>`;
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHTML}
         `;
 
         activitiesList.appendChild(activityCard);
@@ -83,4 +106,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize app
   fetchActivities();
+
+  // Delegação de evento para remover participante
+  activitiesList.addEventListener("click", async (event) => {
+    const btn = event.target.closest(".remove-participant-btn");
+    if (!btn) return;
+
+    const activity = btn.getAttribute("data-activity");
+    const email = btn.getAttribute("data-email");
+    if (!activity || !email) return;
+
+    if (!confirm(`Deseja remover ${email} da atividade ${activity}?`)) return;
+
+    try {
+      const response = await fetch(`/activities/${encodeURIComponent(activity)}/participants/${encodeURIComponent(email)}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+      if (response.ok) {
+        messageDiv.textContent = result.message;
+        messageDiv.className = "success";
+        // Atualiza a lista de atividades
+        fetchActivities();
+      } else {
+        messageDiv.textContent = result.detail || "Erro ao remover participante.";
+        messageDiv.className = "error";
+      }
+      messageDiv.classList.remove("hidden");
+      setTimeout(() => {
+        messageDiv.classList.add("hidden");
+      }, 5000);
+    } catch (error) {
+      messageDiv.textContent = "Erro ao remover participante.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Erro ao remover participante:", error);
+    }
+  });
 });
